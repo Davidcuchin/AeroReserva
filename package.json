@@ -3,15 +3,35 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",
+    "db:up": "docker compose up -d --wait",
+    "setup": "npm run env:init && npm run db:up && npm run db:generate && npm run db:migrate && npm run db:seed",
+    "test": "node --import tsx --test tests/rules.test.ts",
+    "test:integration": "node --env-file=.env --import tsx --test tests/integration.test.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write app components lib prisma tests auth.ts next.config.ts",
+    "format:check": "prettier --check app components lib tests auth.ts next.config.ts",
+    "test:http": "node --env-file=.env --import tsx --test tests/auth-http.test.ts",
+    "env:init": "node scripts/init-env.mjs",
+    "backup": "sh scripts/backup.sh",
+    "package": "node scripts/package.mjs"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "@prisma/client": "^6.19.3",
+    "argon2": "^0.45.1",
+    "lucide-react": "^1.49.0",
     "next": "16.3.8",
+    "next-auth": "^5.0.0-beta.32",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,7 +40,13 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "prettier": "^3.9.9",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
   }
 }

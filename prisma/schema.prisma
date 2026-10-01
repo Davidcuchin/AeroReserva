@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  ALUMNO
+  INSTRUCTOR
+  ADMINISTRADOR
+}
+enum Status {
+  CONFIRMADA
+  CANCELADA
+}
+model User {
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  passwordHash String
+  role Role @default(ALUMNO)
+  active Boolean @default(true)
+  sessions LoginSession[]
+  qualifications Qualification[]
+  availability Availability[]
+  studentBookings Booking[] @relation("student")
+  instructorBookings Booking[] @relation("instructor")
+  createdBookings Booking[] @relation("creator")
+  audits Audit[]
+  resource Resource?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model LoginSession {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  lastSeen DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+}
+model LoginAttempt {
+  key String @id
+  count Int @default(1)
+  windowStart DateTime @default(now()) @db.Timestamptz(3)
+}
+model Aircraft {
+  id String @id @default(cuid())
+  registration String @unique
+  model String
+  seats Int @default(2)
+  active Boolean @default(true)
+  bookings Booking[]
+  resource Resource?
+}
+model Resource {
+  id String @id @default(cuid())
+  userId String? @unique
+  aircraftId String? @unique
+  user User? @relation(fields: [userId], references: [id])
+  aircraft Aircraft? @relation(fields: [aircraftId], references: [id])
+  occupancies Occupancy[]
+  blocks Block[]
+}
+model Qualification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  model String
+  validUntil DateTime @db.Timestamptz(3)
+  @@unique([userId, model])
+}
+model Availability {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  start DateTime @db.Timestamptz(3)
+  end DateTime @db.Timestamptz(3)
+  @@index([userId, start, end])
+}
+model Booking {
+  id String @id @default(cuid())
+  studentId String
+  student User @relation("student", fields: [studentId], references: [id])
+  instructorId String
+  instructor User @relation("instructor", fields: [instructorId], references: [id])
+  aircraftId String
+  aircraft Aircraft @relation(fields: [aircraftId], references: [id])
+  creatorId String
+  creator User @relation("creator", fields: [creatorId], references: [id])
+  requestKey String
+  requestHash String
+  start DateTime @db.Timestamptz(3)
+  end DateTime @db.Timestamptz(3)
+  status Status @default(CONFIRMADA)
+  note String @default("")
+  reminder Boolean @default(false)
+  reminderRead Boolean @default(false)
+  cancelReason String?
+  occupancies Occupancy[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([creatorId, requestKey])
+  @@index([start, end])
+}
+model Block {
+  id String @id @default(cuid())
+  resourceId String
+  resource Resource @relation(fields: [resourceId], references: [id])
+  start DateTime @db.Timestamptz(3)
+  end DateTime @db.Timestamptz(3)
+  reason String
+  active Boolean @default(true)
+  occupancies Occupancy[]
+}
+model Occupancy {
+  id String @id @default(cuid())
+  resourceId String
+  resource Resource @relation(fields: [resourceId], references: [id])
+  bookingId String?
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  blockId String?
+  block Block? @relation(fields: [blockId], references: [id])
+  start DateTime @db.Timestamptz(3)
+  end DateTime @db.Timestamptz(3)
+  active Boolean @default(true)
+  @@index([resourceId, start, end])
+}
+model Audit {
+  id String @id @default(cuid())
+  actorId String
+  actor User @relation(fields: [actorId], references: [id])
+  entity String
+  entityId String
+  action String
+  reason String @default("")
+  before Json?
+  after Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([entityId, createdAt])
+}

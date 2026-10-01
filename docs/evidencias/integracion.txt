@@ -1,0 +1,25 @@
+
+> aeroreserva@0.1.0 test:integration
+> node --env-file=.env --import tsx --test tests/integration.test.ts
+
+▶ PostgreSQL acceptance scenarios (real transactions)
+  ✔ PA02: foreign student rejected server-side (7.662625ms)
+  ✔ PA04: concurrent requests, exactly one confirmation, three allocations (42.056459ms)
+  ✔ PA06: adjacent accepted, overlapping rejected (26.301292ms)
+  ✔ PA05: missing qualification, inactive aircraft, instructor availability (16.437708ms)
+  ✔ PA09: failed reschedule preserves original booking and allocations (21.070916ms)
+  ✔ PA10/PA12/PA13: cancel releases resources, reminder disabled, audit kept (20.527708ms)
+  ✔ PA15: same request concurrent replay, payload mismatch rejected (12.975167ms)
+  ✔ PA11: block conflicts with flight and is auditable (26.25225ms)
+  ✔ PA16: admin changes invalidating future flight are rolled back (77.601875ms)
+  ✔ RF07/RF09: student denied admin, instructor cannot change another instructor (2.696625ms)
+  ✔ RNF01: PostgreSQL exclusion protects independent raw clients (20.426416ms)
+✔ PostgreSQL acceptance scenarios (real transactions) (329.319417ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 489.278042

@@ -1,0 +1,11 @@
+ reservas 
+----------
+        7
+(1 row)
+
+ auditorias 
+------------
+          7
+(1 row)
+
+Restauración verificada en base temporal.

@@ -1,69 +1,124 @@
-import Image from "next/image";
-
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+import { currentUser } from "@/lib/session";
+import { db } from "@/lib/db";
+import { isAdmin } from "@/lib/rules";
+import { Dashboard } from "@/components/dashboard";
+import type { AppData, Person } from "@/lib/view-types";
+export const dynamic = "force-dynamic";
+export default async function Home() {
+  const user = await currentUser(),
+    admin = isAdmin(user);
+  const [people, planes, flights, resources, blocks, availability, audits] =
+    await Promise.all([
+      db.user.findMany({
+        where: admin
+          ? {}
+          : { OR: [{ id: user.id }, { role: "INSTRUCTOR", active: true }] },
+        include: { qualifications: true },
+        orderBy: { name: "asc" },
+      }),
+      db.aircraft.findMany({ orderBy: { registration: "asc" } }),
+      db.booking.findMany({
+        include: { student: true, instructor: true, aircraft: true },
+        orderBy: { start: "desc" },
+      }),
+      db.resource.findMany({ include: { user: true, aircraft: true } }),
+      db.block.findMany({ where: { active: true } }),
+      db.availability.findMany({
+        where: { end: { gt: new Date() } },
+        orderBy: { start: "asc" },
+      }),
+      db.audit.findMany({
+        where: admin
+          ? {}
+          : {
+              entity: "Reserva",
+              entityId: {
+                in: (
+                  await db.booking.findMany({
+                    where: {
+                      OR: [{ studentId: user.id }, { instructorId: user.id }],
+                    },
+                    select: { id: true },
+                  })
+                ).map((b) => b.id),
+              },
+            },
+        include: { actor: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 150,
+      }),
+    ]);
+  const person = (p: (typeof people)[number]): Person => ({
+    id: p.id,
+    name: p.name,
+    email: admin || p.id === user.id ? p.email : "",
+    role: p.role,
+    active: p.active,
+    qualifications:
+      admin || p.id === user.id
+        ? p.qualifications.map((q) => ({
+            id: q.id,
+            model: q.model,
+            validUntil: q.validUntil.toISOString(),
+          }))
+        : [],
+  });
+  const data: AppData = {
+    user: person(people.find((p) => p.id === user.id)!),
+    users: people.map(person),
+    planes,
+    flights: flights.map((b) => {
+      const visible =
+        admin || b.studentId === user.id || b.instructorId === user.id;
+      return {
+        id: b.id,
+        studentId: visible ? b.studentId : "",
+        instructorId: b.instructorId,
+        aircraftId: b.aircraftId,
+        start: b.start.toISOString(),
+        end: b.end.toISOString(),
+        status: b.status,
+        note: visible ? b.note : "",
+        reminder: visible ? b.reminder : false,
+        reminderRead: visible ? b.reminderRead : true,
+        student: visible ? b.student.name : "Ocupado",
+        instructor: visible ? b.instructor.name : "",
+        registration: b.aircraft.registration,
+        model: b.aircraft.model,
+        private: !visible,
+        cancelReason: visible ? b.cancelReason : null,
+      };
+    }),
+    resources: resources
+      .filter((r) => admin || r.aircraftId || r.userId === user.id)
+      .map((r) => ({
+        id: r.id,
+        label: r.aircraft
+          ? `${r.aircraft.registration} · ${r.aircraft.model}`
+          : r.user!.name,
+      })),
+    blocks: blocks.map((b) => ({
+      ...b,
+      start: b.start.toISOString(),
+      end: b.end.toISOString(),
+      reason: admin ? b.reason : "No disponible",
+    })),
+    availability: availability.map((a) => ({
+      ...a,
+      start: a.start.toISOString(),
+      end: a.end.toISOString(),
+    })),
+    audits: audits.map((a) => ({
+      id: a.id,
+      actor: a.actor.name,
+      entity: a.entity,
+      entityId: a.entityId,
+      action: a.action,
+      reason: a.reason,
+      createdAt: a.createdAt.toISOString(),
+      before: a.before,
+      after: a.after,
+    })),
+  };
+  return <Dashboard data={data} />;
 }
