@@ -4,6 +4,7 @@ import { PrismaClient, Role } from "@prisma/client";
 import { Temporal } from "@js-temporal/polyfill";
 import { db } from "../lib/db";
 import { cancelBooking, saveBooking } from "../lib/service";
+import { dueReminders } from "../lib/reminders";
 import { administer } from "../lib/admin-service";
 const prefix = "test-" + Date.now();
 const admin = { id: prefix + "admin", role: Role.ADMINISTRADOR },
@@ -308,6 +309,178 @@ test("PostgreSQL acceptance scenarios (real transactions)", async (t) => {
           }),
           /propia disponibilidad/,
         );
+      },
+    );
+    await t.test(
+      "PA10 regression: duplicate cancellation is idempotent and still checks ownership",
+      async () => {
+        try {
+          const b = await saveBooking(s, input());
+          const first = await cancelBooking(s, b.id, "Cambio de planes");
+          const repeated = await cancelBooking(s, b.id, "Cambio de planes");
+          assert.equal(repeated.id, first.id);
+          assert.equal(repeated.status, "CANCELADA");
+          assert.equal(
+            await db.audit.count({
+              where: { entityId: b.id, action: "CANCELAR" },
+            }),
+            1,
+          );
+          await assert.rejects(
+            cancelBooking(s2, b.id, "Cambio de planes"),
+            /permiso/,
+          );
+        } finally {
+          await clear();
+        }
+      },
+    );
+    await t.test(
+      "PA09 regression: reschedule over a block returns a domain conflict and keeps original allocations",
+      async () => {
+        try {
+          const b = await saveBooking(s, input());
+          const r = await db.resource.findUniqueOrThrow({
+            where: { aircraftId: plane },
+          });
+          await administer(admin, "block", {
+            resourceId: r.id,
+            start: at(120),
+            end: at(180),
+            reason: "Mantenimiento preventivo",
+          });
+          await assert.rejects(
+            saveBooking(s, input({ start: at(120), end: at(180) }), b.id),
+            /coincide con otra reserva o bloqueo/,
+          );
+          const original = await db.booking.findUniqueOrThrow({
+            where: { id: b.id },
+          });
+          assert.equal(
+            original.start.toISOString(),
+            new Date(at(0)).toISOString(),
+          );
+          assert.equal(
+            await db.occupancy.count({
+              where: { bookingId: b.id, active: true },
+            }),
+            3,
+          );
+        } finally {
+          await clear();
+        }
+      },
+    );
+
+    await t.test(
+      "PA07/PA08: instructor privileges, busy instructor, availability and audit",
+      async () => {
+        try {
+          const b = await saveBooking(i, input());
+          await assert.rejects(
+            saveBooking(s2, input({ studentId: s2.id, aircraftId: plane2 })),
+            /coincide/,
+          );
+          await assert.rejects(
+            saveBooking(
+              s2,
+              input({
+                studentId: s2.id,
+                instructorId: i2.id,
+                aircraftId: plane2,
+                start: at(660),
+                end: at(720),
+              }),
+            ),
+            /disponibilidad/,
+          );
+          await saveBooking(
+            i,
+            input({
+              start: at(60),
+              end: at(120),
+              reason: "Ajuste por instrucción",
+            }),
+            b.id,
+          );
+          assert.equal(
+            await db.audit.count({
+              where: { entityId: b.id, action: "REPROGRAMAR", actorId: i.id },
+            }),
+            1,
+          );
+        } finally {
+          await clear();
+        }
+      },
+    );
+    await t.test(
+      "PA11: concurrent block and booking permit exactly one winner",
+      async () => {
+        try {
+          const r = await db.resource.findUniqueOrThrow({
+            where: { aircraftId: plane },
+          });
+          const outcomes = await Promise.allSettled([
+            saveBooking(s, input()),
+            administer(admin, "block", {
+              resourceId: r.id,
+              start: at(0),
+              end: at(60),
+              reason: "Mantenimiento concurrente",
+            }),
+          ]);
+          assert.equal(
+            outcomes.filter((o) => o.status === "fulfilled").length,
+            1,
+          );
+          assert.equal(
+            await db.occupancy.count({
+              where: { resourceId: r.id, active: true },
+            }),
+            1,
+          );
+        } finally {
+          await clear();
+        }
+      },
+    );
+    await t.test(
+      "PA13/CU10: due reminders revalidate ownership, time, state, reading and rescheduling",
+      async () => {
+        try {
+          const b = await saveBooking(s, input());
+          const before = new Date(new Date(at(0)).getTime() - 30 * 60000);
+          assert.equal(
+            (await dueReminders(s.id, new Date(before.getTime() - 1))).length,
+            0,
+          );
+          assert.deepEqual(
+            (await dueReminders(s.id, before)).map((r) => r.id),
+            [b.id],
+          );
+          assert.equal((await dueReminders(s2.id, before)).length, 0);
+          assert.equal((await dueReminders(s.id, new Date(at(0)))).length, 0);
+          await db.booking.update({
+            where: { id: b.id },
+            data: { reminderRead: true },
+          });
+          assert.equal((await dueReminders(s.id, before)).length, 0);
+          await saveBooking(s, input({ start: at(60), end: at(120) }), b.id);
+          assert.equal((await dueReminders(s.id, before)).length, 0);
+          const due = new Date(new Date(at(60)).getTime() - 30 * 60000);
+          assert.equal((await dueReminders(s.id, due)).length, 1);
+          await cancelBooking(s, b.id, "Cambio de planificación");
+          assert.equal((await dueReminders(s.id, due)).length, 0);
+          const without = await saveBooking(
+            s,
+            input({ reminder: false, note: "" }),
+          );
+          assert.equal(without.note, "");
+          assert.equal((await dueReminders(s.id, before)).length, 0);
+        } finally {
+          await clear();
+        }
       },
     );
     await t.test(

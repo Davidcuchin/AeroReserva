@@ -1,0 +1,3 @@
+XML válido: 5 páginas; IDs únicos y referencias válidas.
+17 casos; 3 include y 3 extend con dirección y estilo correctos; 2 especializaciones de CU03; herencia Instructor → Administrador.
+7 componentes lógicos. Validación estructural; no se afirma renderizado visual en Draw.io.

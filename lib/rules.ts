@@ -116,3 +116,14 @@ export const dateLabel = (
     hourCycle: "h23",
     ...options,
   }).format(new Date(date));
+
+export const REMINDER_LEAD_MS = 30 * 60 * 1000;
+export function canScheduleReminder(start: Date, now = new Date()) {
+  return start.getTime() - now.getTime() >= REMINDER_LEAD_MS;
+}
+export function overlapsCalendarDay(start: string, end: string, day: string) {
+  const date = Temporal.PlainDate.from(day);
+  const lower = date.toZonedDateTime(ZONE).epochMilliseconds;
+  const upper = date.add({ days: 1 }).toZonedDateTime(ZONE).epochMilliseconds;
+  return Date.parse(start) < upper && Date.parse(end) > lower;
+}

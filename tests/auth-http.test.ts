@@ -69,6 +69,7 @@ test("PA01/RNF02: Auth.js HTTP security workflow", async (t) => {
   try {
     await t.test("unauthenticated export denied", async () => {
       assert.equal((await fetch(base + "/api/calendar")).status, 401);
+      assert.equal((await fetch(base + "/api/reminders")).status, 401);
     });
     await t.test("wrong password and inactive account rejected", async () => {
       const c = new Client();
@@ -116,6 +117,33 @@ test("PA01/RNF02: Auth.js HTTP security workflow", async (t) => {
           (await fetch(base + "/api/calendar", { headers: { cookie } })).status,
           401,
         );
+      },
+    );
+    await t.test(
+      "automatic reminder polling checks sessions without extending idle timeout",
+      async () => {
+        const c = new Client();
+        await c.login(email, password);
+        const lastSeen = new Date(Date.now() - 10 * 60000);
+        await db.loginSession.updateMany({
+          where: { userId: id },
+          data: { lastSeen },
+        });
+        const response = await c.request("/api/reminders");
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+        assert.deepEqual(await response.json(), { reminders: [] });
+        const sessions = await db.loginSession.findMany({
+          where: { userId: id },
+        });
+        assert.ok(
+          sessions.every((s) => s.lastSeen.getTime() === lastSeen.getTime()),
+        );
+        await db.loginSession.updateMany({
+          where: { userId: id },
+          data: { lastSeen: new Date(Date.now() - 31 * 60000) },
+        });
+        assert.equal((await c.request("/api/reminders")).status, 401);
       },
     );
     await t.test("30-minute idle timeout enforced server-side", async () => {

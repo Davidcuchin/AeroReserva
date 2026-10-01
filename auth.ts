@@ -18,7 +18,7 @@ const dummyHash = argon2.hash("constant-dummy-password-not-a-user", {
   timeCost: 2,
   parallelism: 1,
 });
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth((request) => ({
   pages: { signIn: "/login" },
   session: { strategy: "jwt", maxAge: 8 * 60 * 60 },
   providers: [
@@ -67,10 +67,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.lastSeen.getTime() < Date.now() - 30 * 60 * 1000
       )
         return null;
-      await db.loginSession.update({
-        where: { id: session.id },
-        data: { lastSeen: new Date() },
-      });
+      // Automatic reminder polling must not extend the inactivity timeout.
+      if (request?.nextUrl.pathname !== "/api/reminders")
+        await db.loginSession.update({
+          where: { id: session.id },
+          data: { lastSeen: new Date() },
+        });
       token.sub = session.user.id;
       return token;
     },
@@ -85,4 +87,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         await db.loginSession.deleteMany({ where: { id: message.token.sid } });
     },
   },
-});
+}));

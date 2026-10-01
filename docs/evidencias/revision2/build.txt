@@ -1,0 +1,33 @@
+
+> aeroreserva@0.1.0 build
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 28ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1164ms
+  Running TypeScript ...
+  Finished TypeScript in 1238ms ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/7) ...
+  Generating static pages using 9 workers (1/7) 
+  Generating static pages using 9 workers (3/7) 
+  Generating static pages using 9 workers (5/7) 
+✓ Generating static pages using 9 workers (7/7) in 131ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/calendar
+├ ƒ /api/reminders
+├ ○ /icon.svg
+└ ○ /login
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -2,7 +2,7 @@
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { currentUser } from "@/lib/session";
-import { BusinessError } from "@/lib/rules";
+import { BusinessError, bookingSchema } from "@/lib/rules";
 import { ZodError } from "zod";
 import { revalidatePath } from "next/cache";
 import { cancelBooking, saveBooking } from "@/lib/service";
@@ -38,7 +38,11 @@ export async function bookingAction(
     revalidatePath("/");
     return {
       ok: true,
-      message: id ? "Reserva reprogramada." : "Tu reserva está confirmada.",
+      message:
+        (id ? "Reserva reprogramada." : "Tu reserva está confirmada.") +
+        (bookingSchema.parse(raw).reminder && !b.reminder
+          ? " No se programó el recordatorio porque faltan menos de 30 minutos."
+          : ""),
       id: b.id,
     };
   } catch (error) {

@@ -1,0 +1,20 @@
+
+> aeroreserva@0.1.0 test
+> node --import tsx --test tests/rules.test.ts
+
+✔ RN01/RN02: future, ordered, half-hour blocks and horizon (6.522875ms)
+✔ RN10: reject missing and ambiguous Chilean local hours (0.442584ms)
+✔ RN05: Strategy permits own student bookings and administrative roles (0.081084ms)
+✔ RN07: cannot modify foreign, started or cancelled booking; admin reason required (0.08825ms)
+✔ RF11: note limit and required fields (0.908042ms)
+✔ RF12: calendar escapes notes, hides private details, folds UTF-8, uses UTC instants (0.311042ms)
+✔ CU10: reminder scheduling requires at least thirty minutes (0.042417ms)
+✔ RN06/RN10: calendar uses half-open local days, including DST (0.539709ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 191.298792

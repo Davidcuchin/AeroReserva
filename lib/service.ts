@@ -9,6 +9,7 @@ import {
   isAdmin,
   policyFor,
   instant,
+  canScheduleReminder,
   type Actor,
 } from "./rules";
 export type Tx = Prisma.TransactionClient;
@@ -153,7 +154,9 @@ export async function saveBooking(actor: Actor, raw: unknown, id?: string) {
         resourceId: { in: resources.map((r) => r.id) },
         start: { lt: times.end },
         end: { gt: times.start },
-        ...(id ? { NOT: { bookingId: id } } : {}),
+        ...(id
+          ? { OR: [{ bookingId: null }, { bookingId: { not: id } }] }
+          : {}),
       },
     });
     if (conflict)
@@ -166,7 +169,7 @@ export async function saveBooking(actor: Actor, raw: unknown, id?: string) {
       aircraftId: data.aircraftId,
       ...times,
       note: data.note,
-      reminder: data.reminder,
+      reminder: data.reminder && canScheduleReminder(times.start),
       reminderRead: false,
     };
     const booking = old
@@ -212,6 +215,9 @@ export async function cancelBooking(actor: Actor, id: string, reason: string) {
   return atomic(actor, async (tx, current) => {
     const old = await tx.booking.findUnique({ where: { id } });
     if (!old) throw new BusinessError("Reserva no encontrada.");
+    if (!isAdmin(current) && current.id !== old.studentId)
+      throw new BusinessError("No tienes permiso para modificar esta reserva.");
+    if (old.status === "CANCELADA") return old;
     canEdit(current, old, reason);
     const updated = await tx.booking.update({
       where: { id },

@@ -1,0 +1,88 @@
+
+> aeroreserva@0.1.0 test:integration
+> node --env-file=.env --import tsx --test tests/integration.test.ts
+
+▶ PostgreSQL acceptance scenarios (real transactions)
+  ✔ PA02: foreign student rejected server-side (7.755041ms)
+  ✔ PA04: concurrent requests, exactly one confirmation, three allocations (28.088333ms)
+  ✔ PA06: adjacent accepted, overlapping rejected (19.958916ms)
+  ✔ PA05: missing qualification, inactive aircraft, instructor availability (13.169875ms)
+  ✔ PA09: failed reschedule preserves original booking and allocations (20.682041ms)
+  ✔ PA10/PA12/PA13: cancel releases resources, reminder disabled, audit kept (19.598833ms)
+  ✔ PA15: same request concurrent replay, payload mismatch rejected (13.890792ms)
+  ✔ PA11: block conflicts with flight and is auditable (23.667209ms)
+  ✔ PA16: admin changes invalidating future flight are rolled back (64.380833ms)
+  ✔ RF07/RF09: student denied admin, instructor cannot change another instructor (2.6315ms)
+  ✖ PA10 regression: duplicate cancellation is idempotent and still checks ownership (12.933459ms)
+  ✖ PA09 regression: reschedule over a block returns a domain conflict and keeps original allocations (28.095084ms)
+  ✔ RNF01: PostgreSQL exclusion protects independent raw clients (13.597791ms)
+✖ PostgreSQL acceptance scenarios (real transactions) (332.293792ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 11
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1530.892625
+
+✖ failing tests:
+
+test at tests/integration.test.ts:2:8918
+✖ PA10 regression: duplicate cancellation is idempotent and still checks ownership (12.933459ms)
+  Error: Solo puedes modificar reservas confirmadas que no han comenzado.
+      at canEdit (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/lib/rules.ts:104:11)
+      at <anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/lib/service.ts:215:5)
+      at async Proxy._transactionWithCallback (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:722:18)
+      at async TestContext.<anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/tests/integration.test.ts:317:26)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/tests/integration.test.ts:313:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at tests/integration.test.ts:2:9585
+✖ PA09 regression: reschedule over a block returns a domain conflict and keeps original allocations (28.095084ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /coincide con otra reserva o bloqueo/. Input:
+  
+  'PrismaClientUnknownRequestError: \n' +
+    'Invalid `tx.occupancy.createMany()` invocation in\n' +
+    '/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/lib/service.ts:187:24\n' +
+    '\n' +
+    '  184     where: { bookingId: id, active: true },\n' +
+    '  185     data: { active: false },\n' +
+    '  186   });\n' +
+    '→ 187 await tx.occupancy.createMany(\n' +
+    'Error occurred during query execution:\n' +
+    `ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "23P01", message: "conflicting key value violates exclusion constraint \\"no_overlap\\"", severity: "ERROR", detail: Some("Key (\\"resourceId\\", tstzrange(start, \\"end\\", '[)'::text))=(cmuq2mrrv0005uve630p8rzqo, [\\"2026-10-11 15:00:00+00\\",\\"2026-10-11 16:00:00+00\\")) conflicts with existing key (\\"resourceId\\", tstzrange(start, \\"end\\", '[)'::text))=(cmuq2mrrv0005uve630p8rzqo, [\\"2026-10-11 15:00:00+00\\",\\"2026-10-11 16:00:00+00\\"))."), column: None, hint: None }), transient: false })`
+  
+      at async TestContext.<anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/tests/integration.test.ts:329:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/tests/integration.test.ts:324:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: PrismaClientUnknownRequestError: 
+    Invalid `tx.occupancy.createMany()` invocation in
+    /Users/davidcuchin/Documents/Ing Software APP/aeroreserva/lib/service.ts:187:24
+    
+      184     where: { bookingId: id, active: true },
+      185     data: { active: false },
+      186   });
+    → 187 await tx.occupancy.createMany(
+    Error occurred during query execution:
+    ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "23P01", message: "conflicting key value violates exclusion constraint \"no_overlap\"", severity: "ERROR", detail: Some("Key (\"resourceId\", tstzrange(start, \"end\", '[)'::text))=(cmuq2mrrv0005uve630p8rzqo, [\"2026-10-11 15:00:00+00\",\"2026-10-11 16:00:00+00\")) conflicts with existing key (\"resourceId\", tstzrange(start, \"end\", '[)'::text))=(cmuq2mrrv0005uve630p8rzqo, [\"2026-10-11 15:00:00+00\",\"2026-10-11 16:00:00+00\"))."), column: None, hint: None }), transient: false })
+        at ei.handleRequestError (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+        at ei.handleAndLogRequestError (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+        at ei.request (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+        at async a (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:833:24)
+        at async <anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/lib/service.ts:187:5)
+        at async Proxy._transactionWithCallback (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:722:18)
+        at async waitForActual (node:assert:615:5)
+        at async strict.rejects (node:assert:738:25)
+        at async TestContext.<anonymous> (/Users/davidcuchin/Documents/Ing Software APP/aeroreserva/tests/integration.test.ts:329:9)
+        at async Test.run (node:internal/test_runner/test:1389:7),
+    expected: /coincide con otra reserva o bloqueo/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

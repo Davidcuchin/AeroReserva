@@ -35,7 +35,7 @@ La cuenta `instructor@aeroreserva.cl` cuenta con las funciones administrativas y
 
 ## Recordatorios
 
-La campana muestra reservas propias confirmadas durante las próximas 24 horas con la opción de recordatorio activada. Marcar leído solo modifica el aviso. Reprogramar recalcula la ventana y cancelar desactiva el recordatorio. No hay envíos por correo ni notificaciones fuera de la aplicación.
+La campana muestra reservas propias confirmadas que comienzan en los próximos 30 minutos. El aviso debe solicitarse con al menos 30 minutos de anticipación; si falta menos, la reserva se confirma igualmente y se informa que no se programó el aviso. Con la aplicación abierta, se consulta al servidor cada minuto y al recuperar el foco. La consulta vuelve a comprobar estado, horario y lectura, y no prolonga la sesión por inactividad. Marcar leído solo modifica el aviso. Reprogramar recalcula la ventana y cancelar desactiva el recordatorio. Si falla la consulta, se informa y se reintenta, sin modificar la reserva. No hay envíos por correo ni notificaciones fuera de la aplicación.
 
 ## Solución de problemas
 

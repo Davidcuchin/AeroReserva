@@ -7,6 +7,8 @@ import {
   canEdit,
   instant,
   interval,
+  canScheduleReminder,
+  overlapsCalendarDay,
 } from "../lib/rules";
 import { calendarFile } from "../lib/ical";
 const now = new Date("2026-10-01T12:00:00Z");
@@ -108,4 +110,38 @@ test("RF12: calendar escapes notes, hides private details, folds UTF-8, uses UTC
   assert.ok(!hidden.includes("Alumno"));
   assert.ok(!hidden.includes("Instructor"));
   assert.ok(!hidden.includes("Hola"));
+});
+
+test("CU10: reminder scheduling requires at least thirty minutes", () => {
+  assert.equal(
+    canScheduleReminder(new Date(now.getTime() + 30 * 60000), now),
+    true,
+  );
+  assert.equal(
+    canScheduleReminder(new Date(now.getTime() + 30 * 60000 - 1), now),
+    false,
+  );
+  assert.equal(canScheduleReminder(now, now), false);
+});
+test("RN06/RN10: calendar uses half-open local days, including DST", () => {
+  const s = instant("2026-10-01T23:30").toISOString();
+  const e = instant("2026-10-02T00:00").toISOString();
+  assert.equal(overlapsCalendarDay(s, e, "2026-10-01"), true);
+  assert.equal(overlapsCalendarDay(s, e, "2026-10-02"), false);
+  assert.equal(
+    overlapsCalendarDay(
+      "2026-09-06T04:00:00Z",
+      "2026-09-06T04:30:00Z",
+      "2026-09-06",
+    ),
+    true,
+  );
+  assert.equal(
+    overlapsCalendarDay(
+      "2026-04-05T02:30:00Z",
+      "2026-04-05T03:30:00Z",
+      "2026-04-04",
+    ),
+    true,
+  );
 });

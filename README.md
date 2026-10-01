@@ -62,16 +62,18 @@ La ruta usada por `test:http` se puede cambiar con `TEST_BASE_URL`. Los resultad
 
 | Carpeta / archivo | Responsabilidad |
 |---|---|
-| `app/` | Páginas, Server Actions y rutas Auth.js / iCalendar |
+| `app/` | Páginas, Server Actions y rutas Auth.js / iCalendar / recordatorios |
 | `components/` | Interfaz de acceso y plataforma |
 | `auth.ts` | Autenticación, limitación y revocación de sesiones |
 | `lib/rules.ts` | Zod, intervalos, zona horaria y políticas Strategy |
 | `lib/service.ts` | Transacción de reserva, cancelación y auditoría |
 | `lib/admin-service.ts` | Administración y protección de reservas existentes |
+| `lib/reminders.ts` | Consulta de avisos vigentes y propios a 30 minutos |
 | `lib/ical.ts` | Exportación iCalendar y escape de texto |
 | `prisma/` | Esquema, migración SQL y seed |
 | `tests/` | Pruebas unitarias, de integración y HTTP |
 | `docs/INFORME_EVALUACION_3.md` | Informe, trazabilidad, riesgos y límites |
+| `docs/REVISION_EVALUACION_3.md` | Segunda revisión, correcciones y evidencia actualizada |
 | `docs/MANUAL.md` | Recorrido de demostración y operación |
 | `docs/uml/AeroReserva.drawio` | Diagramas UML editables en Draw.io |
 

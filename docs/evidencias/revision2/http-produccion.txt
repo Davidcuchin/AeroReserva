@@ -1,0 +1,21 @@
+
+> aeroreserva@0.1.0 test:http
+> node --env-file=.env --import tsx --test tests/auth-http.test.ts
+
+▶ PA01/RNF02: Auth.js HTTP security workflow
+  ✔ unauthenticated export denied (55.478584ms)
+  ✔ wrong password and inactive account rejected (103.2035ms)
+  ✔ login throttles after five attempts (169.457917ms)
+  ✔ missing CSRF rejected (4.747292ms)
+  ✔ valid login, private export, signout revokes even a copied old cookie (74.508959ms)
+  ✔ automatic reminder polling checks sessions without extending idle timeout (52.664709ms)
+  ✔ 30-minute idle timeout enforced server-side (41.619416ms)
+✔ PA01/RNF02: Auth.js HTTP security workflow (562.91375ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 647.233708

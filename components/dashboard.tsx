@@ -2,6 +2,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   useTransition,
@@ -42,7 +43,7 @@ import type {
   Person,
   Plane as Aircraft,
 } from "@/lib/view-types";
-import { dateLabel, ZONE } from "@/lib/rules";
+import { dateLabel, overlapsCalendarDay, ZONE } from "@/lib/rules";
 import {
   bookingAction,
   cancelAction,
@@ -89,7 +90,6 @@ const local = (iso: string) =>
     .toPlainDateTime()
     .toString()
     .slice(0, 16);
-const dayOf = (iso: string) => local(iso).slice(0, 10);
 const time = (iso: string) =>
   dateLabel(iso, { hour: "2-digit", minute: "2-digit" });
 const niceDay = (iso: string) =>
@@ -147,6 +147,7 @@ function Dialog({
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     ref.current?.showModal();
     const el = ref.current;
@@ -155,6 +156,7 @@ function Dialog({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       className="modal"
       onCancel={close}
       onClick={(e) => {
@@ -164,7 +166,7 @@ function Dialog({
       <div className="modal-head">
         <div>
           <span className="mini-label">AERORESERVA</span>
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
         </div>
         <button
           className="icon-button"
@@ -180,7 +182,6 @@ function Dialog({
   );
 }
 export function Dashboard({ data }: { data: AppData }) {
-  const [now] = useState(() => Date.now());
   const { user } = data,
     admin = user.role !== "ALUMNO";
   const [tab, setTab] = useState<Tab>("overview"),
@@ -202,15 +203,51 @@ export function Dashboard({ data }: { data: AppData }) {
   const next = myFlights
     .filter((b) => b.status === "CONFIRMADA" && new Date(b.start) > new Date())
     .sort((a, b) => a.start.localeCompare(b.start));
-  const reminders = myFlights.filter(
-    (b) =>
-      b.studentId === user.id &&
-      b.reminder &&
-      !b.reminderRead &&
-      b.status === "CONFIRMADA" &&
-      new Date(b.start) > new Date() &&
-      new Date(b.start).getTime() < now + 24 * 3600000,
-  );
+  const [reminders, setReminders] = useState<
+    Pick<Flight, "id" | "start" | "instructor" | "registration">[]
+  >([]);
+  const [reminderError, setReminderError] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    const controller = new AbortController();
+    async function refreshReminders() {
+      try {
+        const response = await fetch("/api/reminders", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok)
+          throw new Error(
+            response.status === 401
+              ? "Inicia sesión nuevamente para consultar tus recordatorios."
+              : "No se pudieron actualizar los recordatorios. Se reintentará automáticamente.",
+          );
+        const result = await response.json();
+        if (!stopped) {
+          setReminders(result.reminders);
+          setReminderError("");
+        }
+      } catch (error) {
+        if (!stopped) {
+          setReminders([]);
+          setReminderError(
+            error instanceof Error
+              ? error.message
+              : "No se pudieron actualizar los recordatorios.",
+          );
+        }
+      }
+    }
+    void refreshReminders();
+    const timer = setInterval(refreshReminders, 60_000);
+    window.addEventListener("focus", refreshReminders);
+    return () => {
+      stopped = true;
+      controller.abort();
+      clearInterval(timer);
+      window.removeEventListener("focus", refreshReminders);
+    };
+  }, [data.flights]);
   const chosen = Temporal.PlainDate.from(date),
     start =
       view === "week"
@@ -400,7 +437,7 @@ export function Dashboard({ data }: { data: AppData }) {
           {days.map((day) => {
             const d = Temporal.PlainDate.from(day),
               list = filtered
-                .filter((b) => dayOf(b.start) <= day && dayOf(b.end) >= day)
+                .filter((b) => overlapsCalendarDay(b.start, b.end, day))
                 .sort((a, b) => a.start.localeCompare(b.start));
             return (
               <div className="calendar-column" key={day}>
@@ -413,8 +450,7 @@ export function Dashboard({ data }: { data: AppData }) {
                   {data.blocks
                     .filter(
                       (b) =>
-                        dayOf(b.start) <= day &&
-                        dayOf(b.end) >= day &&
+                        overlapsCalendarDay(b.start, b.end, day) &&
                         (!aircraft ||
                           data.resources
                             .find((r) => r.id === b.resourceId)
@@ -638,7 +674,7 @@ export function Dashboard({ data }: { data: AppData }) {
             <section className="panel reminders">
               <div className="panel-header">
                 <h2>
-                  <Bell size={19} /> Recordatorios · Próximas 24 horas
+                  <Bell size={19} /> Recordatorios · Próximos 30 minutos
                 </h2>
                 <button
                   className="icon-button"
@@ -648,6 +684,7 @@ export function Dashboard({ data }: { data: AppData }) {
                   <X size={18} />
                 </button>
               </div>
+              {reminderError && <p role="status">{reminderError}</p>}
               {reminders.length ? (
                 reminders.map((b) => (
                   <div className="list-row" key={b.id}>
@@ -669,8 +706,12 @@ export function Dashboard({ data }: { data: AppData }) {
                 ))
               ) : (
                 <Empty
-                  title="Estás al día"
-                  description="Tus recordatorios aparecerán 24 horas antes de cada vuelo."
+                  title={
+                    reminderError
+                      ? "Recordatorios sin actualizar"
+                      : "Estás al día"
+                  }
+                  description="Se consultan cada minuto mientras la aplicación está abierta. Aparecen 30 minutos antes del vuelo si los solicitaste con suficiente anticipación."
                 />
               )}
             </section>
@@ -1467,7 +1508,7 @@ function Editor({
                   name="reminder"
                   defaultChecked={b?.reminder}
                 />{" "}
-                Recordarme dentro de la aplicación 24 horas antes
+                Recordarme dentro de la aplicación 30 minutos antes
               </label>
               {b && data.user.role !== "ALUMNO" && (
                 <Field label="Motivo del cambio">

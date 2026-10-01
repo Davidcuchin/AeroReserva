@@ -61,10 +61,10 @@ Como referencia chilena, la Ley 21.459 regula delitos informáticos. Su consider
 
 El archivo `uml/AeroReserva.drawio` contiene cinco vistas editables:
 
-1. **Casos de uso:** alumno, administrador e instructor; herencia de permisos del instructor; operaciones propias y administrativas.
+1. **Casos de uso:** CU01–CU17 del informe original; tres relaciones include, tres extend, CU04/CU05 especializados desde CU03 abstracto y herencia del instructor.
 2. **Clases del dominio:** User, LoginSession, Qualification, Aircraft, Resource, Booking, Occupancy, Block, Availability y Audit.
 3. **Strategy:** interfaz BookingPolicy, StudentPolicy y AdministrativePolicy; contexto representado por el módulo de servicio.
-4. **Componentes:** interfaz, Next.js, identidad, dominio, iCalendar y PostgreSQL.
+4. **Componentes:** InterfazWeb, Identidad, Reservas, Recursos, Notificaciones, Persistencia y BaseDatosAeroReserva; siete responsabilidades lógicas en una aplicación y una base.
 5. **Secuencia:** validación de sesión, transacción, idempotencia, política, validaciones, inserciones y ramas de commit/rollback.
 
 ### Adaptaciones respecto del informe de diseño
@@ -72,7 +72,8 @@ El archivo `uml/AeroReserva.drawio` contiene cinco vistas editables:
 - Los nombres de código están en inglés; la interfaz mantiene español. Usuario → User, Reserva → Booking, RecursoAgenda → Resource, Ocupación → Occupancy, Habilitación → Qualification.
 - El servicio es un módulo de funciones TypeScript. Las variantes Strategy sí son clases que realizan una interfaz común; se seleccionan por solicitud y no mediante estado global mutable.
 - Se reemplazó el bloqueo ordenado por filas de recursos por un **bloqueo asesor transaccional global**, compartido por todas las mutaciones del dominio. Es más conservador y simple para el prototipo; evita carreras de cambios administrativos con reservas, a costa de menor paralelismo. Se conserva la exclusión SQL por recurso como defensa independiente.
-- El recordatorio se deriva de la reserva confirmada y su ventana de 24 horas. No crea otra reserva ni depende de un servicio externo. `reminderRead` registra lectura.
+- El recordatorio se habilita si se solicita con al menos 30 minutos de anticipación. Se deriva de reservas confirmadas dentro de los próximos 30 minutos y no leídas. `/api/reminders` revalida cada consulta; la interfaz consulta cada minuto y al recuperar foco sin renovar la inactividad. No hay avisos con la aplicación cerrada ni servicio externo. Un fallo de lectura no revierte una reserva. `reminderRead` registra lectura.
+- La herencia conceptual de RecursoAgenda se adapta a una asociación uno a uno de Resource con User o Aircraft, con XOR obligatorio en SQL. Los tres recursos de una reserva comparten la misma restricción temporal, conservando la semántica del diseño.
 - El cierre de sesión añade LoginSession revocable al JWT de Auth.js; así se impide reutilizar una cookie capturada antes de cerrar sesión.
 - El historial genérico enlaza por entidad/identificador y conserva valores JSON. Solo se entrega al cliente información permitida por el rol.
 
@@ -100,11 +101,11 @@ El archivo `uml/AeroReserva.drawio` contiene cinco vistas editables:
 ### Entorno y resultados ejecutados
 
 - macOS ARM64, Node.js 26.4.0, PostgreSQL 17 en Docker; pruebas contra `127.0.0.1`.
-- `npm test`: **6 pruebas de reglas/exportación**, aprobadas.
-- `npm run test:integration`: **11 escenarios de aceptación** y su prueba contenedora, aprobados. Node informa 12 pruebas.
-- `npm run test:http`: **6 escenarios HTTP** y su prueba contenedora, aprobados. Node informa 7 pruebas.
-- Total: **23 escenarios**, o 25 resultados contando las dos pruebas contenedoras. Se conserva la salida sin inventar porcentajes de cobertura.
-- TypeScript, ESLint, validación Prisma y compilación de producción ejecutados satisfactoriamente; las salidas se conservan en `evidencias/`.
+- `npm test`: **8 pruebas de reglas/exportación**, aprobadas.
+- `npm run test:integration`: **16 escenarios de aceptación** y su prueba contenedora, aprobados. Node informa 17 pruebas.
+- `npm run test:http`: **7 escenarios HTTP** y su prueba contenedora, aprobados. Node informa 8 pruebas.
+- Total: **31 escenarios**, o 33 resultados contando las dos pruebas contenedoras. Se conserva la salida sin inventar porcentajes de cobertura. La repetición HTTP contra producción también aprobó los 7 escenarios y no se suma como cobertura distinta.
+- TypeScript, ESLint, validación Prisma y compilación de producción ejecutados satisfactoriamente; las salidas actualizadas de TypeScript, ESLint y compilación están en `evidencias/revision2/`; la validación Prisma y las evidencias iniciales permanecen en `evidencias/`.
 - Auditoría de dependencias: se actualizó la dependencia transitiva `deepmerge-ts` a la versión corregida mediante override; el análisis npm final no reportó vulnerabilidades conocidas en esa ejecución. Esto no equivale a ausencia demostrada de todas las vulnerabilidades.
 - Respaldo/restauración: se restauraron **7 reservas y 7 entradas de auditoría** del momento del respaldo en una base temporal. No se sobrescribió la base principal.
 
@@ -114,7 +115,9 @@ El archivo `uml/AeroReserva.drawio` contiene cinco vistas editables:
 
 **Atomicidad:** un cambio hacia un intervalo ocupado no modifica horario ni ocupaciones originales. Cancelar desactiva las tres ocupaciones, desactiva el aviso y permite reservar de nuevo.
 
-**Idempotencia:** dos envíos simultáneos con una misma clave y carga devuelven el mismo identificador; variar la carga reutilizando la clave se rechaza.
+**Idempotencia:** dos envíos simultáneos con una misma clave y carga devuelven el mismo identificador; variar la carga reutilizando la clave se rechaza. Repetir una cancelación autorizada devuelve CANCELADA sin duplicar auditoría ni efectos.
+
+**Segunda revisión:** `REVISION_EVALUACION_3.md` documenta discrepancias detectadas, dos regresiones fallidas antes de corregir y pruebas aprobadas después. Incluye conflictos de bloqueos durante reprogramación, avisos de 30 minutos, límites de día y coherencia UML.
 
 **Acceso:** se rechazan contraseñas incorrectas, cuentas inactivas, peticiones de autenticación sin CSRF y exportaciones anónimas. Cerrar sesión revoca incluso una copia de la cookie anterior; la inactividad se aplica en el servidor.
 
